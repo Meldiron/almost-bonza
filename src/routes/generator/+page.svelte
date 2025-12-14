@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { Button } from '$lib/components/ui/button';
 	import * as Card from '$lib/components/ui/card/index.js';
 	import {
 		FieldGroup,
@@ -6,15 +7,14 @@
 		FieldLabel,
 		FieldDescription
 	} from '$lib/components/ui/field/index.js';
-	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { resolve } from '$app/paths';
-	import { Button } from '$lib/components/ui/button/index.js';
-	import { Textarea } from '$lib/components/ui/textarea/index.js';
-	import { generateCrossword } from '$lib/generator';
+	import { Spinner } from '$lib/components/ui/spinner/index.js';
+	import { Textarea } from '$lib/components/ui/textarea';
+	import { generateCrossword, type GeneratorResult } from '$lib/generator';
 
 	const id = $props.id();
 
-	let gameState = $state<object>({});
+	let gameState = $state<GeneratorResult | null>(null);
 	let loading = $state(false);
 	let words = $state('');
 	let showRegenerate = $state(false);
@@ -82,7 +82,7 @@
 					<div class="relative flex items-center justify-end bg-neutral-900">
 						<iframe
 							title="Game preview"
-							src={`/play?state=${btoa(JSON.stringify(gameState))}`}
+							src={`/play?state=${gameState ? btoa(JSON.stringify(gameState)) : ''}`}
 							width="500"
 							height="500"
 						></iframe>
