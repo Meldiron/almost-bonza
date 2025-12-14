@@ -36,6 +36,7 @@ export type GeneratorBricksResult = {
 export type GameState = {
 	bricks: GeneratorBricksResult['bricks'];
 	hint: string;
+  words: string[];
 };
 
 export function generateCrossword(words: string[], retries = 1): GeneratorBlocksResult {

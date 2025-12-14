@@ -70,6 +70,7 @@
 		loading = false;
 
 		gameState = {
+			words: words.split('\n'),
 			hint,
 			bricks: brickCrossword.bricks
 		};
@@ -164,7 +165,7 @@
 						<div class="mb-1.5 overflow-hidden rounded-xl border border-neutral-800">
 							<iframe
 								title="Game preview"
-								src={`/play?state=${gameState ? btoa(JSON.stringify(gameState)) : ''}`}
+								src={`/play?mode=editor&state=${gameState ? btoa(JSON.stringify(gameState)) : ''}`}
 								width="500"
 								height="500"
 							></iframe>
