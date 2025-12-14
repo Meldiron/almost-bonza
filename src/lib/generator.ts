@@ -38,10 +38,9 @@ export type GameState = {
 	hint: string;
 };
 
-export function generateCrossword(words: string[]): GeneratorBlocksResult {
-  const randomWords = words.sort(() => Math.random() - 0.5);
-  console.log("R", randomWords);
-  
+export function generateCrossword(words: string[], retries = 1): GeneratorBlocksResult {
+	const randomWords = words.sort(() => Math.random() - 0.5);
+
 	const layout: CLSResult = clg.generateLayout(
 		randomWords.map((word) => {
 			return {
@@ -67,9 +66,63 @@ export function generateCrossword(words: string[]): GeneratorBlocksResult {
 		}
 	}
 
-	return {
+	const output = {
 		blocks: [...blockMap.values()]
 	};
+
+	if (!validateCrossword(output)) {
+		if (retries > 10) {
+			alert("Puzzle generated, but it's not valid because it consists of multiple continents.");
+		} else {
+			return generateCrossword(words, retries + 1);
+		}
+	}
+
+	return output;
+}
+
+function validateCrossword(crossword: GeneratorBlocksResult): boolean {
+	const blocks = crossword.blocks;
+
+	if (blocks.length === 0) {
+		return true;
+	}
+
+	// Start with the first block
+	const visited = new Set<string>();
+	const queue = [blocks[0]];
+	visited.add(`${blocks[0].x},${blocks[0].y}`);
+
+	// BFS to find all connected blocks
+	while (queue.length > 0) {
+		const currentBlock = queue.shift()!;
+
+		// Check all 4 directions (up, down, left, right)
+		const neighbors = [
+			{ x: currentBlock.x, y: currentBlock.y + 1 },
+			{ x: currentBlock.x, y: currentBlock.y - 1 },
+			{ x: currentBlock.x + 1, y: currentBlock.y },
+			{ x: currentBlock.x - 1, y: currentBlock.y }
+		];
+
+		for (const neighborPos of neighbors) {
+			const neighborKey = `${neighborPos.x},${neighborPos.y}`;
+
+			// Find if this neighbor position exists in our blocks
+			const neighborBlock = blocks.find(
+				(block) => block.x === neighborPos.x && block.y === neighborPos.y
+			);
+
+			// If neighbor exists and hasn't been visited, add to queue
+			if (neighborBlock && !visited.has(neighborKey)) {
+				visited.add(neighborKey);
+				queue.push(neighborBlock);
+			}
+		}
+	}
+
+	// If we visited all blocks, the crossword is connected
+	return visited.size === blocks.length;
 }
 
 export function blocksToBricks(
@@ -170,7 +223,6 @@ export function blocksToBricks(
 
 		// If brick has only one block, try to merge it with an existing brick
 		if (currentBrick.blocks.length === 1) {
-			console.log('Fixing ', currentBrick.blocks[0].letter);
 			const singleBlock = currentBrick.blocks[0];
 			let merged = false;
 
@@ -211,4 +263,111 @@ export function blocksToBricks(
 	return {
 		bricks: bricks
 	};
+}
+
+export function shuffleBricks(bricks: GeneratorBricksResult["bricks"]): GeneratorBricksResult {
+  // Shuffle bricks in a compact area near origin with 1-block gaps minimum
+  
+  // Keep track of occupied positions (including 1-block buffer zones)
+  const occupiedPositions = new Set<string>();
+  
+  // Helper function to check if a position conflicts with occupied areas
+  const isPositionValid = (brick: { blocks: { x: number; y: number; letter: string }[] }) => {
+    for (const block of brick.blocks) {
+      // Check if this exact block position is occupied
+      const blockKey = `${block.x},${block.y}`;
+      if (occupiedPositions.has(blockKey)) {
+        return false;
+      }
+    }
+    return true;
+  };
+  
+  // Helper function to mark positions as occupied (including buffer zones)
+  const markPositionsOccupied = (brick: { blocks: { x: number; y: number; letter: string }[] }) => {
+    for (const block of brick.blocks) {
+      // Mark only the block position and adjacent positions (not diagonals) as occupied
+      const positions = [
+        `${block.x},${block.y}`, // the block itself
+        `${block.x + 1},${block.y}`, // right
+        `${block.x - 1},${block.y}`, // left
+        `${block.x},${block.y + 1}`, // up
+        `${block.x},${block.y - 1}`  // down
+      ];
+      
+      for (const key of positions) {
+        occupiedPositions.add(key);
+      }
+    }
+  };
+  
+  // Randomize the order of bricks to process
+  const randomizedBricks = [...bricks].sort(() => Math.random() - 0.5);
+  
+  const shuffledBricks = [];
+  
+  for (const originalBrick of randomizedBricks) {
+    // Find the bounds of this brick
+    let brickMinX = Infinity, brickMaxX = -Infinity;
+    let brickMinY = Infinity, brickMaxY = -Infinity;
+    
+    for (const block of originalBrick.blocks) {
+      brickMinX = Math.min(brickMinX, block.x);
+      brickMaxX = Math.max(brickMaxX, block.x);
+      brickMinY = Math.min(brickMinY, block.y);
+      brickMaxY = Math.max(brickMaxY, block.y);
+    }
+    
+    // Try to place the brick starting from positions close to origin
+    let placed = false;
+    const maxAttempts = 1000;
+    
+    for (let attempt = 0; attempt < maxAttempts && !placed; attempt++) {
+      // Generate positions in expanding rings around origin
+      const ring = Math.floor(attempt / 8);
+      const ringPosition = attempt % 8;
+      
+      let targetX, targetY;
+      
+      if (ring === 0) {
+        targetX = 0;
+        targetY = 0;
+      } else {
+        // Place positions in a spiral pattern around origin
+        const angle = (ringPosition / 8) * 2 * Math.PI;
+        targetX = Math.round(Math.cos(angle) * ring);
+        targetY = Math.round(Math.sin(angle) * ring);
+      }
+      
+      // Calculate offset to move brick to target position
+      const offsetX = targetX - brickMinX;
+      const offsetY = targetY - brickMinY;
+      
+      // Create the brick at the new position
+      const newBrick = {
+        blocks: originalBrick.blocks.map(block => ({
+          x: block.x + offsetX,
+          y: block.y + offsetY,
+          letter: block.letter
+        }))
+      };
+      
+      // Check if this position is valid
+      if (isPositionValid(newBrick)) {
+        shuffledBricks.push(newBrick);
+        markPositionsOccupied(newBrick);
+        placed = true;
+      }
+    }
+    
+    // If we couldn't place the brick, just place it somewhere that works
+    if (!placed) {
+      shuffledBricks.push(originalBrick);
+      markPositionsOccupied(originalBrick);
+    }
+  }
+  
+  return {
+    bricks: shuffledBricks
+  };
 }

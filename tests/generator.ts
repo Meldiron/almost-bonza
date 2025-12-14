@@ -6,13 +6,8 @@ function testBricks() {
 	const blockCrossword = generateCrossword(words);
 	const blocks = blockCrossword.blocks;
 	
-	console.log('Generated blocks:');
-	console.log(JSON.stringify(blocks, null, 2));
 	const brickCrossword = blocksToBricks(blocks);
 	const bricks = brickCrossword.bricks;
-	
-	console.log('Generated bricks:');
-	console.log(JSON.stringify(bricks, null, 2));
 	
   const blocksCount = blocks.length;
   let bricksInBricksCount = 0;
@@ -37,13 +32,11 @@ function testBricks() {
       const currentBlock = brick.blocks[i];
       
       if(!isNeighbour(currentBlock, nextBlock)) {
-        console.log(brick);
         throw new Error('Brick with non-neighboring blocks generated.');
       }
     }
 	}
 	
-  console.log(JSON.stringify(bricks, null, 2));
 }
 
 function isNeighbour(block1: { x: number, y: number, letter: string}, block2: { x: number, y: number, letter: string}) {

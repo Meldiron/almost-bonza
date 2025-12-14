@@ -10,8 +10,26 @@
 	import { resolve } from '$app/paths';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { blocksToBricks, generateCrossword, type GameState } from '$lib/generator';
+	import { blocksToBricks, generateCrossword, shuffleBricks, type GameState } from '$lib/generator';
 	import Input from '$lib/components/ui/input/input.svelte';
+	import FieldSeparator from '$lib/components/ui/field/field-separator.svelte';
+
+	const templates: {
+		[key: string]: { hint: string; words: string[] };
+	} = {
+		chess: {
+			hint: 'Chess pieces',
+			words: ['rook', 'knight', 'bishop', 'king']
+		},
+		languages: {
+			hint: 'Coding languages',
+			words: ['javascript', 'python', 'ruby', 'php', 'go', 'rust', 'typescript']
+		},
+		colors: {
+			hint: 'Color names',
+			words: ['blue', 'green', 'yellow', 'orange', 'black', 'white', 'pink', 'brown']
+		}
+	};
 
 	const id = $props.id();
 
@@ -27,6 +45,18 @@
 		}
 	});
 
+	function onShuffle() {
+		if (!gameState) {
+			return;
+		}
+
+		const bricks = gameState.bricks;
+		const result = shuffleBricks(bricks);
+
+		gameState.bricks = result.bricks;
+		gameState = gameState;
+	}
+
 	async function onSubmit(event: SubmitEvent) {
 		event.preventDefault();
 
@@ -35,10 +65,6 @@
 
 		const blockCrossword = generateCrossword(words.split('\n'));
 		const brickCrossword = blocksToBricks(blockCrossword.blocks);
-		
-		console.log(words.split('\n'));
-		console.log(blockCrossword.blocks);
-		console.log(brickCrossword.bricks);
 
 		showRegenerate = true;
 		loading = false;
@@ -47,6 +73,18 @@
 			hint,
 			bricks: brickCrossword.bricks
 		};
+	}
+
+	function generateTemplate(templateKey: string) {
+		const template = templates[templateKey];
+		if (!template) {
+			return;
+		}
+
+		words = template.words.join('\n');
+		hint = template.hint;
+
+		onSubmit(new SubmitEvent('submit'));
 	}
 </script>
 
@@ -88,7 +126,34 @@
 										{showRegenerate ? 'Re-generate' : 'Generate'}
 									</Button>
 								{/if}
+
+								{#if showRegenerate}
+									<Button
+										class="cursor-pointer"
+										type="button"
+										onclick={() => onShuffle()}
+										variant="outline"
+									>
+										Shuffle pieces
+									</Button>
+								{/if}
 							</Field>
+							<FieldSeparator class="*:data-[slot=field-separator-content]:bg-card">
+								Or try our examples
+							</FieldSeparator>
+							<Field class="grid grid-cols-3 gap-4">
+								{#each Object.keys(templates) as templateKey (templateKey)}
+									<Button
+										onclick={() => generateTemplate(templateKey)}
+										variant="outline"
+										class="cursor-pointer text-xs font-light"
+										type="button"
+									>
+										{templates[templateKey].hint}
+									</Button>
+								{/each}
+							</Field>
+
 							<FieldDescription class="text-center">
 								Want to play? <a href={resolve('/')}>Go to Almost Bonza</a>
 							</FieldDescription>

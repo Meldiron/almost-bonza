@@ -10,7 +10,6 @@
 	let sketch: any;
 	onMount(() => {
 		const stateParam = $page.url.searchParams.get('state');
-		console.log(stateParam);
 		if (stateParam) {
 			try {
 				gameState = JSON.parse(atob(stateParam));
@@ -21,9 +20,26 @@
 
 			if (gameState) {
 				sketch = (p5: any) => {
-					const controls = {
+					const controls: {
+						view: { x: number, y: number, zoom: number },
+						viewPos: { prevX: number | null, prevY: number | null, isDragging: boolean },
+						blockDrag: {
+							isDragging: boolean,
+							draggedBrick: GameState['bricks'][number] | null,
+							originalPositions: Array<{ x: number, y: number }>,
+							startPos: { x: number, y: number },
+							offset: { x: number, y: number }
+						}
+					} = {
 						view: { x: 0, y: 0, zoom: 0.5 },
-						viewPos: { prevX: null, prevY: null, isDragging: false }
+						viewPos: { prevX: null, prevY: null, isDragging: false },
+						blockDrag: {
+							isDragging: false,
+							draggedBrick: null,
+							originalPositions: [],
+							startPos: { x: 0, y: 0 },
+							offset: { x: 0, y: 0 }
+						}
 					};
 
 					p5.setup = () => {
@@ -45,29 +61,104 @@
 					};
 
 					p5.mousePressed = () => {
-						controls.viewPos.isDragging = true;
-						controls.viewPos.prevX = p5.mouseX;
-						controls.viewPos.prevY = p5.mouseY;
+					if(!gameState) {
+					return;
+					}
+					
+						const worldPos = screenToWorld(p5, p5.mouseX, p5.mouseY, controls);
+						const clickedBrick = getBrickAtPosition(worldPos.x, worldPos.y, gameState);
+						
+						if (clickedBrick) {
+							// Start dragging a brick
+							controls.blockDrag.isDragging = true;
+							controls.blockDrag.draggedBrick = clickedBrick;
+							controls.blockDrag.originalPositions = clickedBrick.blocks.map(block => ({ x: block.x, y: block.y }));
+							controls.blockDrag.startPos = { x: worldPos.x, y: worldPos.y };
+							
+							// Calculate offset from where we clicked relative to the first block's position
+							const firstBlock = clickedBrick.blocks[0];
+							const blockX = firstBlock.x * 64;
+							const blockY = firstBlock.y * 64;
+							controls.blockDrag.offset = {
+								x: worldPos.x - blockX,
+								y: worldPos.y - blockY
+							};
+						} else {
+							// Start dragging the view
+							controls.viewPos.isDragging = true;
+							controls.viewPos.prevX = p5.mouseX;
+							controls.viewPos.prevY = p5.mouseY;
+						}
 					};
 
 					p5.mouseDragged = () => {
-						const { prevX, prevY, isDragging } = controls.viewPos;
-						if (!isDragging) return;
+						if (controls.blockDrag.isDragging && controls.blockDrag.draggedBrick) {
+							// Dragging a brick - preserve precise position
+							const worldPos = screenToWorld(p5, p5.mouseX, p5.mouseY, controls);
+							
+							// Calculate new position for the first block (reference point) without snapping
+							const targetX = worldPos.x - controls.blockDrag.offset.x;
+							const targetY = worldPos.y - controls.blockDrag.offset.y;
+							
+							// Calculate the difference from original position in grid units
+							const firstOriginalBlock = controls.blockDrag.originalPositions[0];
+							const deltaX = (targetX / 64) - firstOriginalBlock.x;
+							const deltaY = (targetY / 64) - firstOriginalBlock.y;
+							
+							// Update all blocks in the brick with precise positioning
+							for (let i = 0; i < controls.blockDrag.draggedBrick.blocks.length; i++) {
+								const block = controls.blockDrag.draggedBrick.blocks[i];
+								const originalPos = controls.blockDrag.originalPositions[i];
+								block.x = originalPos.x + deltaX;
+								block.y = originalPos.y + deltaY;
+							}
+						} else if (controls.viewPos.isDragging) {
+							// Dragging the view
+							const { prevX, prevY } = controls.viewPos;
+							const pos = { x: p5.mouseX, y: p5.mouseY };
+							const dx = pos.x - (prevX ?? 0);
+							const dy = pos.y - (prevY ?? 0);
 
-						const pos = { x: p5.mouseX, y: p5.mouseY };
-						const dx = pos.x - (prevX ?? 0);
-						const dy = pos.y - (prevY ?? 0);
-
-						if (prevX || prevY) {
-							controls.view.x += dx;
-							controls.view.y += dy;
-
-							controls.viewPos.prevX = pos.x;
-							controls.viewPos.prevY = pos.y;
+							if (prevX || prevY) {
+								controls.view.x += dx;
+								controls.view.y += dy;
+								controls.viewPos.prevX = pos.x;
+								controls.viewPos.prevY = pos.y;
+							}
 						}
 					};
 
 					p5.mouseReleased = () => {
+					if(!gameState) {
+					return;
+					}
+					
+						if (controls.blockDrag.isDragging && controls.blockDrag.draggedBrick) {
+							// Snap to grid first
+							for (const block of controls.blockDrag.draggedBrick.blocks) {
+								block.x = Math.round(block.x);
+								block.y = Math.round(block.y);
+							}
+							
+							// Check for collisions with other bricks
+							const hasCollision = checkCollisions(controls.blockDrag.draggedBrick, gameState);
+							
+							if (hasCollision) {
+								// Revert to original positions
+								for (let i = 0; i < controls.blockDrag.draggedBrick.blocks.length; i++) {
+									const block = controls.blockDrag.draggedBrick.blocks[i];
+									const originalPos = controls.blockDrag.originalPositions[i];
+									block.x = originalPos.x;
+									block.y = originalPos.y;
+								}
+							}
+							
+							// Reset drag state
+							controls.blockDrag.isDragging = false;
+							controls.blockDrag.draggedBrick = null;
+							controls.blockDrag.originalPositions = [];
+						}
+						
 						controls.viewPos.isDragging = false;
 						controls.viewPos.prevX = null;
 						controls.viewPos.prevY = null;
@@ -102,7 +193,43 @@
 		}
 	});
 
-	function drawBlock(p5: any, block: GameState['blocks'][number]) {
+	function screenToWorld(p5: any, screenX: number, screenY: number, controls: any) {
+		const worldX = (screenX - controls.view.x) / controls.view.zoom;
+		const worldY = (screenY - controls.view.y) / controls.view.zoom;
+		return { x: worldX, y: worldY };
+	}
+
+	function getBrickAtPosition(worldX: number, worldY: number, gameState: GameState) {
+		const gridX = Math.floor(worldX / 64);
+		const gridY = Math.floor(worldY / 64);
+		
+		for (const brick of gameState.bricks) {
+			for (const block of brick.blocks) {
+				if (block.x === gridX && block.y === gridY) {
+					return brick;
+				}
+			}
+		}
+		return null;
+	}
+
+	function checkCollisions(draggedBrick: any, gameState: GameState) {
+		for (const block of draggedBrick.blocks) {
+			// Check collision with other bricks
+			for (const otherBrick of gameState.bricks) {
+				if (otherBrick === draggedBrick) continue;
+				
+				for (const otherBlock of otherBrick.blocks) {
+					if (block.x === otherBlock.x && block.y === otherBlock.y) {
+						return true;
+					}
+				}
+			}
+		}
+		return false;
+	}
+
+	function drawBlock(p5: any, block: GameState['bricks'][number]['blocks'][number]) {
 		const size = 64;
 		p5.fill(23);
 		p5.rect(block.x * size, block.y * size, size, size);
