@@ -10,13 +10,15 @@
 	import { resolve } from '$app/paths';
 	import { Spinner } from '$lib/components/ui/spinner/index.js';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { generateCrossword, type GeneratorResult } from '$lib/generator';
+	import { blocksToBricks, generateCrossword, type GameState } from '$lib/generator';
+	import Input from '$lib/components/ui/input/input.svelte';
 
 	const id = $props.id();
 
-	let gameState = $state<GeneratorResult | null>(null);
+	let gameState = $state<GameState | null>(null);
 	let loading = $state(false);
 	let words = $state('');
+	let hint = $state('');
 	let showRegenerate = $state(false);
 
 	$effect(() => {
@@ -31,12 +33,20 @@
 		loading = true;
 		await new Promise((resolve) => setTimeout(resolve, 300));
 
-		const crossword = generateCrossword(words.split('\n'));
+		const blockCrossword = generateCrossword(words.split('\n'));
+		const brickCrossword = blocksToBricks(blockCrossword.blocks);
+		
+		console.log(words.split('\n'));
+		console.log(blockCrossword.blocks);
+		console.log(brickCrossword.bricks);
 
 		showRegenerate = true;
 		loading = false;
 
-		gameState = crossword;
+		gameState = {
+			hint,
+			bricks: brickCrossword.bricks
+		};
 	}
 </script>
 
@@ -53,11 +63,16 @@
 								<h1 class="text-2xl font-bold">Bonza Generator</h1>
 								<p class="text-balance text-muted-foreground">Create new levels for Almost Bonza</p>
 							</div>
+
+							<Field>
+								<FieldLabel for="email-{id}">Words hint</FieldLabel>
+								<Input bind:value={hint} placeholder="Food and vegetables" required />
+							</Field>
+
 							<Field>
 								<FieldLabel for="email-{id}">Word list</FieldLabel>
 								<Textarea
 									bind:value={words}
-									name="words"
 									class="h-40"
 									placeholder="Enter words on separate lines"
 									required
@@ -79,13 +94,16 @@
 							</FieldDescription>
 						</FieldGroup>
 					</form>
-					<div class="relative flex items-center justify-end bg-neutral-900">
-						<iframe
-							title="Game preview"
-							src={`/play?state=${gameState ? btoa(JSON.stringify(gameState)) : ''}`}
-							width="500"
-							height="500"
-						></iframe>
+					<div class="relative flex flex-col items-center justify-end gap-2 bg-neutral-900">
+						<p class="font-semibold text-balance text-foreground">Game preview</p>
+						<div class="mb-1.5 overflow-hidden rounded-xl border border-neutral-800">
+							<iframe
+								title="Game preview"
+								src={`/play?state=${gameState ? btoa(JSON.stringify(gameState)) : ''}`}
+								width="500"
+								height="500"
+							></iframe>
+						</div>
 					</div>
 				</Card.Content>
 			</Card.Root>

@@ -2,10 +2,10 @@
 	import P5 from 'p5-svelte';
 	import { page } from '$app/stores';
 	import { onMount } from 'svelte';
-	import type { GeneratorResult } from '$lib/generator';
+	import type { GameState } from '$lib/generator';
 
 	let prepared = $state(false);
-	let gameState = $state<GeneratorResult | null>(null);
+	let gameState = $state<GameState | null>(null);
 
 	let sketch: any;
 	onMount(() => {
@@ -39,8 +39,8 @@
 							return;
 						}
 
-						for (const block of gameState.blocks) {
-							drawBlock(p5, block);
+						for (const brick of gameState.bricks) {
+							drawBrick(p5, brick);
 						}
 					};
 
@@ -102,7 +102,7 @@
 		}
 	});
 
-	function drawBlock(p5: any, block: GeneratorResult['blocks'][number]) {
+	function drawBlock(p5: any, block: GameState['blocks'][number]) {
 		const size = 64;
 		p5.fill(23);
 		p5.rect(block.x * size, block.y * size, size, size);
@@ -110,6 +110,63 @@
 		p5.textSize(48);
 		p5.textAlign(p5.CENTER);
 		p5.text(block.letter.toUpperCase(), block.x * size + size / 2, block.y * size + size - 16);
+	}
+
+	function drawBrick(p5: any, brick: GameState['bricks'][number]) {
+		const size = 64;
+		const borderWidth = 1;
+		
+		// First, draw all blocks in the brick
+		for (const block of brick.blocks) {
+			drawBlock(p5, block);
+		}
+		
+		// Then, draw borders around the brick perimeter
+		p5.stroke(70); // Yellow-orange border color
+		p5.strokeWeight(borderWidth);
+		p5.noFill();
+		
+		// Create a set of all block positions in this brick for quick lookup
+		const blockPositions = new Set(brick.blocks.map(block => `${block.x},${block.y}`));
+		
+		// For each block, check which sides need borders (sides that don't touch other blocks in the same brick)
+		for (const block of brick.blocks) {
+			const x = block.x * size;
+			const y = block.y * size;
+			
+			// Check each side and draw border if it's an external edge
+			const neighbors = [
+				{ dx: 0, dy: -1, side: 'top' },    // top
+				{ dx: 1, dy: 0, side: 'right' },   // right  
+				{ dx: 0, dy: 1, side: 'bottom' },  // bottom
+				{ dx: -1, dy: 0, side: 'left' }    // left
+			];
+			
+			for (const neighbor of neighbors) {
+				const neighborKey = `${block.x + neighbor.dx},${block.y + neighbor.dy}`;
+				
+				// If neighbor position is not in this brick, draw border on this side
+				if (!blockPositions.has(neighborKey)) {
+					switch (neighbor.side) {
+						case 'top':
+							p5.line(x, y, x + size, y);
+							break;
+						case 'right':
+							p5.line(x + size, y, x + size, y + size);
+							break;
+						case 'bottom':
+							p5.line(x, y + size, x + size, y + size);
+							break;
+						case 'left':
+							p5.line(x, y, x, y + size);
+							break;
+					}
+				}
+			}
+		}
+		
+		// Reset stroke for other drawing operations
+		p5.noStroke();
 	}
 </script>
 
