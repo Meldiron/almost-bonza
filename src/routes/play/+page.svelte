@@ -22,7 +22,7 @@
 			if (gameState) {
 				sketch = (p5: any) => {
 					const controls = {
-						view: { x: 0, y: 0, zoom: 1 },
+						view: { x: 0, y: 0, zoom: 0.5 },
 						viewPos: { prevX: null, prevY: null, isDragging: false }
 					};
 

@@ -39,8 +39,11 @@ export type GameState = {
 };
 
 export function generateCrossword(words: string[]): GeneratorBlocksResult {
+  const randomWords = words.sort(() => Math.random() - 0.5);
+  console.log("R", randomWords);
+  
 	const layout: CLSResult = clg.generateLayout(
-		words.map((word) => {
+		randomWords.map((word) => {
 			return {
 				clue: '',
 				answer: word
@@ -119,30 +122,6 @@ export function blocksToBricks(
 		return 0.01; // 10% for 6+ blocks
 	};
 
-	// Helper function to find edge blocks (furthest from center)
-	const findEdgeBlocks = () => {
-		if (blocks.length === 0) return [];
-
-		const minX = Math.min(...blocks.map((b) => b.x));
-		const maxX = Math.max(...blocks.map((b) => b.x));
-		const minY = Math.min(...blocks.map((b) => b.y));
-		const maxY = Math.max(...blocks.map((b) => b.y));
-
-		const centerX = (minX + maxX) / 2;
-		const centerY = (minY + maxY) / 2;
-
-		// Calculate distance from center for each block
-		const blockDistances = blocks.map((block) => ({
-			block,
-			distance: Math.sqrt(Math.pow(block.x - centerX, 2) + Math.pow(block.y - centerY, 2))
-		}));
-
-		// Sort by distance descending (furthest first)
-		blockDistances.sort((a, b) => b.distance - a.distance);
-
-		return blockDistances.map((bd) => bd.block);
-	};
-
 	// Recursive function to build a brick
 	const buildBrick = (currentBrick: typeof blocks, startBlock: (typeof blocks)[0]) => {
 		const neighbors = findNeighbors(startBlock);
@@ -159,10 +138,10 @@ export function blocksToBricks(
 	};
 
 	// Sort blocks by edge priority
-	const edgeBlocks = findEdgeBlocks();
+	const randomBlocks = blocks.sort(() => Math.random() - 0.5);
 
 	// Process each block, starting with edge blocks
-	for (const block of edgeBlocks) {
+	for (const block of randomBlocks) {
 		if (usedBlocks.has(getBlockKey(block))) {
 			continue;
 		}
